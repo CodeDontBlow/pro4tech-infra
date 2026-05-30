@@ -1,0 +1,9 @@
+[submodule "ec2-back/pro4tech-backend"]
+	path = ec2-back/pro4tech-backend
+	url = https://github.com/CodeDontBlow/pro4tech-backend
+[submodule "ec2-front/pro4tech-frontend"]
+	path = ec2-front/pro4tech-frontend
+	url = https://github.com/CodeDontBlow/pro4tech-frontend
+[submodule "ec2-front/pro4tech-mobile"]
+	path = ec2-front/pro4tech-mobile
+	url = https://github.com/CodeDontBlow/pro4tech-mobile
