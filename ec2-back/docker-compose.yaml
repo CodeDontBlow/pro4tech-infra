@@ -4,7 +4,7 @@ services:
   backend:
     build:
       context: ./pro4tech-backend
-      dockerfile: Dockerfile
+      dockerfile: ../Dockerfile
     image: pro4tech-backend:latest
     container_name: pro4tech_backend
     restart: unless-stopped
