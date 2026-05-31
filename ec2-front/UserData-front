@@ -1,0 +1,61 @@
+#!/bin/bash
+set -euxo pipefail
+exec > /var/log/userdata-front.log 2>&1
+
+# VARIÁVEIS — edite antes de usar
+CERTBOT_EMAIL="seu-email@exemplo.com"                   # ← seu e-mail real
+BACKEND_PRIVATE_IP="10.0.0.X"                           # ← IP privado da ec2-back
+
+# Derivados (não precisa alterar)
+NEXT_PUBLIC_API_URL="https://web.orbita4tech.hopto.org/api"
+EXPO_PUBLIC_API_URL_WEB="https://web.orbita4tech.hopto.org/api"
+EXPO_PUBLIC_API_URL_ANDROID="http://${BACKEND_PRIVATE_IP}:3333"
+
+APP_DIR="/home/ubuntu/ec2-front"
+
+# 1. ATUALIZAÇÃO DO SISTEMA
+apt-get update -y
+apt-get upgrade -y
+
+# 2. DOCKER + DOCKER COMPOSE
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker ubuntu
+
+# 3. CLONAR REPOSITÓRIOS
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+# Clona o repo de infra e copia apenas a pasta ec2-front
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-infra.git tmp-infra
+cp -r tmp-infra/ec2-front/. .
+rm -rf tmp-infra
+
+# Clona o código-fonte dos apps
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-frontend.git
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-mobile.git
+
+# Ajusta dono de tudo para o usuário ubuntu
+chown -R ubuntu:ubuntu "$APP_DIR"
+
+# 4. CRIAR .env
+cat > "$APP_DIR/.env" <<EOF
+NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+EXPO_PUBLIC_API_URL_WEB=${EXPO_PUBLIC_API_URL_WEB}
+EXPO_PUBLIC_API_URL_ANDROID=${EXPO_PUBLIC_API_URL_ANDROID}
+CERTBOT_EMAIL=${CERTBOT_EMAIL}
+EOF
+
+# 5. SUBIR CONTAINERS (HTTP — sem Certbot ainda)
+# Certbot só roda depois que o DDNS estiver propagado (ver README)
+cd "$APP_DIR"
+docker compose up -d --build frontend mobile nginx-proxy
+
+echo ""
+echo " UserData-front concluído!"
+echo "   Próximos passos (ver README):"
+echo "   1. Confirme que os domínios DDNS apontam para este Elastic IP"
+echo "   2. Teste HTTP: http://web.orbita4tech.hopto.org"
+echo "   3. Emita os certificados: docker compose run --rm certbot"
+echo "   4. Atualize nginx/nginx.conf para HTTPS e recarregue o Nginx"
+echo ""
+echo "   Logs completos em: /var/log/userdata-front.log"

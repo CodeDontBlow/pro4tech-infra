@@ -1,0 +1,71 @@
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: pro4tech_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+    ports:
+      - "5432:5432"         # expõe para a ec2-back via IP privado
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── MongoDB ──────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: pro4tech_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"       # expõe para a ec2-back via IP privado
+    volumes:
+      - mongo_data:/data/db
+
+  # ── MinIO ────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: pro4tech_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    command: server /data
+    ports:
+      - "9000:9000"         # API — usada pelo backend
+    volumes:
+      - minio_data:/data
+
+  # ── MinIO Init (roda uma vez e encerra) ──────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: pro4tech_minio_init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        sleep 5 &&
+        mc alias set local http://minio:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY} &&
+        mc mb -p local/$${MINIO_BUCKET} || true &&
+        mc anonymous set public local/$${MINIO_BUCKET} || true
+      "
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET:     ${MINIO_BUCKET}
+    restart: "no"
+
+volumes:
+  postgres_data:
+    name: pro4tech_postgres_data
+  mongo_data:
+    name: pro4tech_mongo_data
+  minio_data:
+    name: pro4tech_minio_data

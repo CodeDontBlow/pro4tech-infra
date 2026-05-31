@@ -2,14 +2,15 @@
 
 Instância responsável pelo frontend web (Next.js) e mobile web (Expo), com proxy reverso Nginx e HTTPS via Let's Encrypt.
 
-## Estrutura
+## Estrutura do repo `pro4tech-infra/ec2-front`
 
 ```
 ec2-front/
+├── userdata-front.sh            # script colado no User Data ao criar a EC2
 ├── docker-compose.yml
 ├── .env.example
 ├── nginx/
-│   └── nginx.conf               # proxy reverso (HTTP — Certbot adiciona HTTPS depois)
+│   └── nginx.conf               # proxy reverso (HTTP — você atualiza para HTTPS no passo 3)
 ├── pro4tech-frontend/
 │   └── Dockerfile
 └── pro4tech-mobile/
@@ -17,125 +18,94 @@ ec2-front/
     └── nginx.conf               # nginx interno do container mobile
 ```
 
-Na EC2, os repos ficam assim:
+Na EC2, após o User Data rodar, a estrutura fica assim:
+
 ```
-~/ec2-front/
+/home/ubuntu/ec2-front/
 ├── docker-compose.yml
-├── .env
+├── .env                         # criado automaticamente pelo User Data
 ├── nginx/
-├── pro4tech-frontend/           # git clone do repo
-└── pro4tech-mobile/             # git clone do repo
+├── pro4tech-frontend/           # clonado automaticamente
+└── pro4tech-mobile/             # clonado automaticamente
 ```
 
 ---
 
 ## Pré-requisitos
 
-Antes de começar, garanta que:
+Antes de criar a EC2:
 
-- [ ] EC2 Ubuntu 22.04 criada com Elastic IP associado
 - [ ] Security Group com portas **22**, **80** e **443** abertas para `0.0.0.0/0`
+- [ ] Elastic IP criado e pronto para associar
 - [ ] Domínios DDNS configurados no no-ip apontando para o Elastic IP:
   - `web.orbita4tech.hopto.org`
   - `orbita4tech.hopto.org`
-- [ ] EC2 do backend já criada (você precisará do IP privado dela)
+- [ ] IP privado da `ec2-back` em mãos (para preencher o `userdata-front.sh`)
 
 ---
 
-## Primeira execução
+## Criando a EC2
 
-### 1. Instalar Docker na EC2
+### 1. Editar o `userdata-front.sh`
 
-Conecte via SSH e rode:
-
-```bash
-sudo apt-get update -y
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker ubuntu
-newgrp docker
-```
-
-Verifique:
-```bash
-docker --version
-docker compose version
-```
-
-### 2. Clonar os repositórios
+Antes de criar a instância, abra o `userdata-front.sh` e preencha as duas variáveis no topo:
 
 ```bash
-mkdir ~/ec2-front && cd ~/ec2-front
-
-# Infra (docker-compose, Dockerfiles, nginx.conf)
-git clone https://github.com/CodeDontBlow/pro4tech-infra.git tmp-infra
-cp -r tmp-infra/ec2-front/. .
-rm -rf tmp-infra
-
-# Código-fonte
-git clone https://github.com/CodeDontBlow/pro4tech-frontend.git
-git clone https://github.com/CodeDontBlow/pro4tech-mobile.git
+CERTBOT_EMAIL="seu-email@exemplo.com"   # ← seu e-mail real
+BACKEND_PRIVATE_IP="10.0.0.X"           # ← IP privado da ec2-back
 ```
 
-A estrutura final deve ser a mostrada acima.
+### 2. Criar a instância na AWS
 
-### 3. Copiar os Dockerfiles para dentro dos repos
+No painel EC2 → Launch Instance:
+
+- AMI: **Ubuntu 22.04 LTS**
+- Instance type: `t2.micro` (ou maior se disponível)
+- Security Group: portas 22, 80, 443 abertas
+- Em **Advanced details → User data**: cole o conteúdo do `userdata-front.sh`
+
+Associe o Elastic IP à instância após criá-la.
+
+### 3. Acompanhar o progresso
+
+O User Data roda na primeira inicialização e leva alguns minutos (Next.js e Expo compilam dentro do Docker). Para acompanhar:
 
 ```bash
-cp pro4tech-frontend/Dockerfile pro4tech-frontend/Dockerfile   # já está no lugar certo
-cp pro4tech-mobile/Dockerfile   pro4tech-mobile/Dockerfile     # idem
-cp pro4tech-mobile/nginx.conf   pro4tech-mobile/nginx.conf     # idem
+ssh ubuntu@<ELASTIC-IP>
+tail -f /var/log/userdata-front.log
 ```
 
-> Os Dockerfiles já estão clonados dentro de cada pasta de repo. Nenhuma ação adicional necessária.
+Quando aparecer `✅ UserData-front concluído!`, está pronto.
 
-### 4. Configurar variáveis de ambiente
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Preencha:
-
-```bash
-NEXT_PUBLIC_API_URL=https://web.orbita4tech.hopto.org/api
-EXPO_PUBLIC_API_URL_WEB=https://web.orbita4tech.hopto.org/api
-EXPO_PUBLIC_API_URL_ANDROID=http://<IP-PRIVADO-DA-EC2-BACK>:3333
-CERTBOT_EMAIL=seu-email@exemplo.com
-```
-
-> O IP privado da ec2-back aparece no painel da AWS em **EC2 → Instances → Private IPv4 address**.
-
-### 5. Subir os containers (HTTP primeiro)
+Verifique os containers:
 
 ```bash
 cd ~/ec2-front
-docker compose up -d frontend mobile nginx-proxy
-```
-
-Aguarde o build — na primeira vez leva alguns minutos (Next.js e Expo compilam dentro do Docker).
-
-Verifique se tudo subiu:
-```bash
 docker compose ps
 ```
 
-Todos devem estar com status `Up`. Teste no browser:
+Todos devem estar com status `Up`.
+
+---
+
+## Após o User Data — configurar HTTPS
+
+O User Data sobe tudo em HTTP. Os passos abaixo você faz **uma única vez**, após confirmar que os domínios DDNS já estão propagados.
+
+### 1. Testar HTTP
+
+No browser:
 - `http://web.orbita4tech.hopto.org` → deve abrir o Next.js
 - `http://orbita4tech.hopto.org` → deve abrir o Expo web
 
-### 6. Emitir certificados TLS (Let's Encrypt)
+Se não abrir, o DDNS ainda não propagou. Aguarde alguns minutos e tente novamente.
 
-Com o Nginx respondendo na porta 80, rode o Certbot:
+### 2. Emitir os certificados TLS
 
 ```bash
+cd ~/ec2-front
 docker compose run --rm certbot
 ```
-
-O Certbot vai:
-1. Fazer um desafio HTTP no `/.well-known/acme-challenge/` nos dois domínios
-2. Confirmar que os domínios apontam para este servidor
-3. Salvar os certificados no volume `certbot-certs`
 
 Saída esperada ao final:
 ```
@@ -143,17 +113,15 @@ Successfully received certificate.
 Certificate is saved at: /etc/letsencrypt/live/web.orbita4tech.hopto.org/fullchain.pem
 ```
 
-Se falhar com `Connection refused` ou `Timeout`, o DDNS ainda não propagou. Aguarde alguns minutos e tente novamente.
+Se falhar com `Connection refused` ou `Timeout`, o DDNS ainda não propagou. Aguarde e tente novamente.
 
-### 7. Atualizar o Nginx para HTTPS
-
-Abra o arquivo do proxy:
+### 3. Atualizar o Nginx para HTTPS
 
 ```bash
 nano ~/ec2-front/nginx/nginx.conf
 ```
 
-Substitua o conteúdo pelo seguinte (adiciona blocos SSL e redireciona HTTP → HTTPS):
+Substitua **todo o conteúdo** pelo bloco abaixo:
 
 ```nginx
 # ── Redireciona todo HTTP para HTTPS ────────────────────────
@@ -215,7 +183,7 @@ server {
 }
 ```
 
-Salve e recarregue o Nginx:
+### 4. Recarregar o Nginx
 
 ```bash
 docker compose exec nginx-proxy nginx -s reload
@@ -224,24 +192,24 @@ docker compose exec nginx-proxy nginx -s reload
 Teste no browser:
 - `https://web.orbita4tech.hopto.org` → cadeado verde, Next.js
 - `https://orbita4tech.hopto.org` → cadeado verde, Expo web
-- `http://web.orbita4tech.hopto.org` → deve redirecionar para HTTPS
+- `http://web.orbita4tech.hopto.org` → deve redirecionar para HTTPS automaticamente
 
 ---
 
 ## Após reinicialização da sessão AWS Academy
 
-A cada nova sessão do AWS Academy as credenciais mudam, mas a instância EC2 continua rodando. Os containers sobem automaticamente com `restart: unless-stopped`.
+A cada nova sessão do AWS Academy as credenciais mudam, mas a EC2 continua rodando e os containers sobem automaticamente com `restart: unless-stopped`.
 
-Verifique o status ao reconectar:
+Ao reconectar, apenas verifique:
 
 ```bash
-docker compose -f ~/ec2-front/docker-compose.yml ps
+cd ~/ec2-front
+docker compose ps
 ```
 
 Se algum container estiver parado:
 
 ```bash
-cd ~/ec2-front
 docker compose up -d
 ```
 
@@ -253,12 +221,8 @@ Quando houver mudanças nos repos:
 
 ```bash
 cd ~/ec2-front
-
-# Puxa as atualizações
 git -C pro4tech-frontend pull
 git -C pro4tech-mobile pull
-
-# Rebuilda apenas os containers alterados e reinicia
 docker compose build frontend mobile
 docker compose up -d
 ```
@@ -267,13 +231,13 @@ docker compose up -d
 
 ## Renovação dos certificados
 
-Os certificados do Let's Encrypt expiram em **90 dias**. Configure renovação automática:
+Os certificados expiram em **90 dias**. Configure renovação automática:
 
 ```bash
 crontab -e
 ```
 
-Adicione a linha:
+Adicione:
 
 ```
 0 3 * * * cd /home/ubuntu/ec2-front && docker compose run --rm certbot renew --quiet && docker compose exec nginx-proxy nginx -s reload
@@ -292,10 +256,10 @@ docker compose exec nginx-proxy nginx -s reload
 ## Comandos úteis
 
 ```bash
-# Ver logs em tempo real de todos os containers
+# Logs em tempo real de todos os containers
 docker compose logs -f
 
-# Ver logs de um container específico
+# Logs de um container específico
 docker compose logs -f frontend
 docker compose logs -f mobile
 docker compose logs -f nginx-proxy

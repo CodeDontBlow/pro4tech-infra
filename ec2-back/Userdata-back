@@ -1,0 +1,105 @@
+#!/bin/bash
+set -euxo pipefail
+exec > /var/log/userdata-back.log 2>&1
+
+# ─────────────────────────────────────────────────────────────
+# VARIÁVEIS — edite antes de usar
+# ─────────────────────────────────────────────────────────────
+DB_PRIVATE_IP="<IP-PRIVADO-EC2-DB>"      # ← IP privado da ec2-db
+
+POSTGRES_USER="pro4tech"
+POSTGRES_PASSWORD=""                      # ← senha forte
+POSTGRES_DB="pro4tech"
+
+JWT_SECRET=""                             # ← node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+MINIO_ACCESS_KEY=""                       # ← mesmo valor do userdata-db.sh
+MINIO_SECRET_KEY=""                       # ← mesmo valor do userdata-db.sh
+MINIO_BUCKET="pro4tech"
+
+CORS_ORIGIN="https://web.orbita4tech.hopto.org,https://orbita4tech.hopto.org"
+
+PORT=3333
+CHAT_UPLOAD_MAX_MB=10
+AVATAR_UPLOAD_MAX_MB=5
+LOGO_UPLOAD_MAX_MB=5
+TICKET_CREATE_RATE_LIMIT_MAX=3
+TICKET_CREATE_RATE_LIMIT_WINDOW_MS=60000
+
+APP_DIR="/home/ubuntu/ec2-back"
+
+# ─────────────────────────────────────────────────────────────
+# 1. ATUALIZAÇÃO DO SISTEMA
+# ─────────────────────────────────────────────────────────────
+apt-get update -y
+apt-get upgrade -y
+
+# ─────────────────────────────────────────────────────────────
+# 2. DOCKER
+# ─────────────────────────────────────────────────────────────
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker ubuntu
+
+# ─────────────────────────────────────────────────────────────
+# 3. CLONAR REPOSITÓRIOS
+# ─────────────────────────────────────────────────────────────
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+# Infra — copia apenas a pasta ec2-back
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-infra.git tmp-infra
+cp -r tmp-infra/ec2-back/. .
+rm -rf tmp-infra
+
+# Código-fonte do backend
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-backend.git
+
+chown -R ubuntu:ubuntu "$APP_DIR"
+
+# ─────────────────────────────────────────────────────────────
+# 4. CRIAR .env
+# ─────────────────────────────────────────────────────────────
+cat > "$APP_DIR/.env" <<EOF
+PORT=${PORT}
+
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=${POSTGRES_DB}
+POSTGRES_HOST=${DB_PRIVATE_IP}
+POSTGRES_PORT=5432
+
+DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_PRIVATE_IP}:5432/${POSTGRES_DB}?schema=public
+
+MONGO_URI=mongodb://${DB_PRIVATE_IP}:27017/orbita-chat
+
+JWT_SECRET=${JWT_SECRET}
+
+CORS_ORIGIN=${CORS_ORIGIN}
+
+MINIO_ENDPOINT=${DB_PRIVATE_IP}
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+MINIO_BUCKET=${MINIO_BUCKET}
+MINIO_PUBLIC_URL=http://${DB_PRIVATE_IP}:9000
+MINIO_SET_PUBLIC=true
+
+CHAT_UPLOAD_MAX_MB=${CHAT_UPLOAD_MAX_MB}
+AVATAR_UPLOAD_MAX_MB=${AVATAR_UPLOAD_MAX_MB}
+LOGO_UPLOAD_MAX_MB=${LOGO_UPLOAD_MAX_MB}
+
+TICKET_CREATE_RATE_LIMIT_MAX=${TICKET_CREATE_RATE_LIMIT_MAX}
+TICKET_CREATE_RATE_LIMIT_WINDOW_MS=${TICKET_CREATE_RATE_LIMIT_WINDOW_MS}
+EOF
+
+# ─────────────────────────────────────────────────────────────
+# 5. SUBIR BACKEND
+# ─────────────────────────────────────────────────────────────
+cd "$APP_DIR"
+docker compose up -d --build backend
+
+echo ""
+echo "✅ UserData-back concluído!"
+echo "   Logs completos em: /var/log/userdata-back.log"
+echo "   Acompanhe o container: docker compose -f ~/ec2-back/docker-compose.yml logs -f backend"

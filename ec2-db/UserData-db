@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euxo pipefail
+exec > /var/log/userdata-db.log 2>&1
+
+# ─────────────────────────────────────────────────────────────
+# VARIÁVEIS — edite antes de usar
+# ─────────────────────────────────────────────────────────────
+POSTGRES_USER="pro4tech"
+POSTGRES_PASSWORD=""          # ← senha forte (mesma do userdata-back.sh)
+POSTGRES_DB="pro4tech"
+
+MINIO_ACCESS_KEY=""           # ← nome de usuário MinIO (mesma do userdata-back.sh)
+MINIO_SECRET_KEY=""           # ← senha MinIO, mínimo 8 chars (mesma do userdata-back.sh)
+MINIO_BUCKET="pro4tech"
+
+APP_DIR="/home/ubuntu/ec2-db"
+
+# ─────────────────────────────────────────────────────────────
+# 1. ATUALIZAÇÃO DO SISTEMA
+# ─────────────────────────────────────────────────────────────
+apt-get update -y
+apt-get upgrade -y
+
+# ─────────────────────────────────────────────────────────────
+# 2. DOCKER
+# ─────────────────────────────────────────────────────────────
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker ubuntu
+
+# ─────────────────────────────────────────────────────────────
+# 3. CLONAR INFRA
+# ─────────────────────────────────────────────────────────────
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+git clone --depth=1 https://github.com/CodeDontBlow/pro4tech-infra.git tmp-infra
+cp -r tmp-infra/ec2-db/. .
+rm -rf tmp-infra
+
+chown -R ubuntu:ubuntu "$APP_DIR"
+
+# ─────────────────────────────────────────────────────────────
+# 4. CRIAR .env
+# ─────────────────────────────────────────────────────────────
+cat > "$APP_DIR/.env" <<EOF
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=${POSTGRES_DB}
+
+MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+MINIO_BUCKET=${MINIO_BUCKET}
+EOF
+
+# ─────────────────────────────────────────────────────────────
+# 5. SUBIR BANCOS
+# ─────────────────────────────────────────────────────────────
+cd "$APP_DIR"
+docker compose up -d postgres mongo minio minio-init
+
+echo ""
+echo "✅ UserData-db concluído!"
+echo "   Logs completos em: /var/log/userdata-db.log"
+echo "   Verifique os containers: docker compose -f ~/ec2-db/docker-compose.yml ps"
