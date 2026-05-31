@@ -9,19 +9,20 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 
 # build
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+ARG DATABASE_URL
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Gera o Prisma Client (output: ../generated/prisma)
 RUN npx prisma generate
-
 # Compila o TypeScript → dist/
 RUN npm run build
 
@@ -37,8 +38,8 @@ COPY --from=builder /app/dist               ./dist
 COPY --from=builder /app/generated          ./generated
 COPY --from=builder /app/prisma             ./prisma
 COPY --from=builder /app/package.json       ./package.json
-
+COPY --from=builder /app/prisma.config.ts   ./prisma.config.ts
 EXPOSE 3333
 
 # Roda as migrations pendentes e sobe o servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD npx prisma migrate deploy && node dist/main

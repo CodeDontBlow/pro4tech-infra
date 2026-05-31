@@ -5,9 +5,18 @@ services:
     build:
       context: ./pro4tech-backend
       dockerfile: ../Dockerfile
+      args:
+        - DATABASE_URL=${DATABASE_URL}
     image: pro4tech-backend:latest
     container_name: pro4tech_backend
     restart: unless-stopped
     ports:
       - "3333:3333"
-    env_file: .env
+    env_file:
+      - .env
+    command: >
+      sh -c "
+      echo 'module.exports = { schema: \"prisma/schema.prisma\", datasource: { url: \"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public\" } };' > prisma.config.js &&
+      npx prisma migrate deploy &&
+      node dist/src/main
+      "
