@@ -1,0 +1,13 @@
+services:
+
+  # ── Backend NestJS ───────────────────────────────────────────
+  backend:
+    build:
+      context: ./pro4tech-backend
+      dockerfile: Dockerfile
+    image: pro4tech-backend:latest
+    container_name: pro4tech_backend
+    restart: unless-stopped
+    ports:
+      - "3333:3333"
+    env_file: .env
