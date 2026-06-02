@@ -10,7 +10,8 @@ ec2-front/
 ├── docker-compose.yml
 ├── .env.example
 ├── nginx/
-│   └── nginx.conf               # proxy reverso (HTTP — você atualiza para HTTPS no passo 3)
+│   ├── nginx.conf               # proxy reverso (HTTP inicial)
+│   └── nginx.https.conf         # proxy reverso (HTTPS com websocket)
 ├── pro4tech-frontend/
 │   └── Dockerfile
 └── pro4tech-mobile/
@@ -117,71 +118,13 @@ Se falhar com `Connection refused` ou `Timeout`, o DDNS ainda não propagou. Agu
 
 ### 3. Atualizar o Nginx para HTTPS
 
+Copie a configuração HTTPS para substituir a HTTP:
+
 ```bash
-nano ~/ec2-front/nginx/nginx.conf
+cp ~/ec2-front/nginx/nginx.https.conf ~/ec2-front/nginx/nginx.conf
 ```
 
-Substitua **todo o conteúdo** pelo bloco abaixo:
-
-```nginx
-# ── Redireciona todo HTTP para HTTPS ────────────────────────
-server {
-    listen 80;
-    server_name web.orbita4tech.hopto.org orbita4tech.hopto.org;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-# ── Frontend Web (Next.js) — HTTPS ──────────────────────────
-server {
-    listen 443 ssl;
-    server_name web.orbita4tech.hopto.org;
-
-    ssl_certificate     /etc/letsencrypt/live/web.orbita4tech.hopto.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/web.orbita4tech.hopto.org/privkey.pem;
-
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto https;
-
-    location / {
-        proxy_pass         http://frontend:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-
-# ── Mobile / Expo Web — HTTPS ────────────────────────────────
-server {
-    listen 443 ssl;
-    server_name orbita4tech.hopto.org;
-
-    ssl_certificate     /etc/letsencrypt/live/web.orbita4tech.hopto.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/web.orbita4tech.hopto.org/privkey.pem;
-
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto https;
-
-    location / {
-        proxy_pass         http://mobile:80;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
+Se preferir editar manualmente, o conteúdo de `nginx.https.conf` já é o bloco final.
 
 ### 4. Recarregar o Nginx
 
