@@ -3,8 +3,8 @@ services:
   # front next
   frontend:
     build:
-      context: ./pro4tech-frontend        # repo clonado 
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./pro4tech-frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     image: pro4tech-frontend:latest
@@ -15,11 +15,11 @@ services:
     networks:
       - front-net
 
-  # mobile expo web exportado como estático (nginx serve os arquivos) 
+  # mobile expo web exportado como estático
   mobile:
     build:
-      context: ./pro4tech-mobile          # repo clonado 
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./pro4tech-mobile/Dockerfile
       args:
         EXPO_PUBLIC_API_URL_WEB:     ${EXPO_PUBLIC_API_URL_WEB}
         EXPO_PUBLIC_API_URL_ANDROID: ${EXPO_PUBLIC_API_URL_ANDROID}

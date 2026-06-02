@@ -7,8 +7,8 @@ CERTBOT_EMAIL="seu-email@exemplo.com"                   # ← seu e-mail real
 BACKEND_PRIVATE_IP="10.0.0.X"                           # ← IP privado da ec2-back
 
 # Derivados (não precisa alterar)
-NEXT_PUBLIC_API_URL="https://web.orbita4tech.hopto.org/api"
-EXPO_PUBLIC_API_URL_WEB="https://web.orbita4tech.hopto.org/api"
+NEXT_PUBLIC_API_URL="https://orbita4tech.hopto.org/api"
+EXPO_PUBLIC_API_URL_WEB="https://orbita4tech.hopto.org/api"
 EXPO_PUBLIC_API_URL_ANDROID="http://${BACKEND_PRIVATE_IP}:3333"
 
 APP_DIR="/home/ubuntu/ec2-front"
