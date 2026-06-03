@@ -17,7 +17,7 @@ MINIO_ACCESS_KEY=""                       # ← mesmo valor do userdata-db.sh
 MINIO_SECRET_KEY=""                       # ← mesmo valor do userdata-db.sh
 MINIO_BUCKET="pro4tech"
 
-CORS_ORIGIN="https://web.orbita4tech.hopto.org,https://orbita4tech.hopto.org"
+CORS_ORIGIN="https://orbita.hopto.org,https://orbita4tech.hopto.org"
 
 PORT=3333
 CHAT_UPLOAD_MAX_MB=10
