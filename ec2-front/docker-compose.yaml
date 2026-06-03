@@ -3,8 +3,8 @@ services:
   # front next
   frontend:
     build:
-      context: .
-      dockerfile: ./pro4tech-frontend/Dockerfile
+      context: ./pro4tech-frontend
+      dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     image: pro4tech-frontend:latest
@@ -18,8 +18,8 @@ services:
   # mobile expo web exportado como estático
   mobile:
     build:
-      context: .
-      dockerfile: ./pro4tech-mobile/Dockerfile
+      context: ./pro4tech-mobile
+      dockerfile: Dockerfile
       args:
         EXPO_PUBLIC_API_URL_WEB:     ${EXPO_PUBLIC_API_URL_WEB}
         EXPO_PUBLIC_API_URL_ANDROID: ${EXPO_PUBLIC_API_URL_ANDROID}
@@ -64,8 +64,8 @@ services:
       --email ${CERTBOT_EMAIL}
       --agree-tos
       --no-eff-email
-      -d web.orbita4tech.hopto.org
       -d orbita4tech.hopto.org
+      -d orbita.hopto.org
     restart: "no"
 
 volumes:

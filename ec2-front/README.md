@@ -39,8 +39,8 @@ Antes de criar a EC2:
 - [ ] Security Group com portas **22**, **80** e **443** abertas para `0.0.0.0/0`
 - [ ] Elastic IP criado e pronto para associar
 - [ ] Domínios DDNS configurados no no-ip apontando para o Elastic IP:
-  - `web.orbita4tech.hopto.org`
   - `orbita4tech.hopto.org`
+  - `orbita.hopto.org`
 - [ ] IP privado da `ec2-back` em mãos (para preencher o `userdata-front.sh`)
 
 ---
@@ -96,8 +96,8 @@ O User Data sobe tudo em HTTP. Os passos abaixo você faz **uma única vez**, ap
 ### 1. Testar HTTP
 
 No browser:
-- `http://web.orbita4tech.hopto.org` → deve abrir o Next.js
-- `http://orbita4tech.hopto.org` → deve abrir o Expo web
+- `http://orbita4tech.hopto.org` → deve abrir o Next.js
+- `http://orbita.hopto.org` → deve abrir o Expo web
 
 Se não abrir, o DDNS ainda não propagou. Aguarde alguns minutos e tente novamente.
 
@@ -111,7 +111,7 @@ docker compose run --rm certbot
 Saída esperada ao final:
 ```
 Successfully received certificate.
-Certificate is saved at: /etc/letsencrypt/live/web.orbita4tech.hopto.org/fullchain.pem
+Certificate is saved at: /etc/letsencrypt/live/orbita4tech.hopto.org/fullchain.pem
 ```
 
 Se falhar com `Connection refused` ou `Timeout`, o DDNS ainda não propagou. Aguarde e tente novamente.
@@ -133,9 +133,9 @@ docker compose exec nginx-proxy nginx -s reload
 ```
 
 Teste no browser:
-- `https://web.orbita4tech.hopto.org` → cadeado verde, Next.js
-- `https://orbita4tech.hopto.org` → cadeado verde, Expo web
-- `http://web.orbita4tech.hopto.org` → deve redirecionar para HTTPS automaticamente
+- `https://orbita4tech.hopto.org` → cadeado verde, Next.js
+- `https://orbita.hopto.org` → cadeado verde, Expo web
+- `http://orbita4tech.hopto.org` → deve redirecionar para HTTPS automaticamente
 
 ---
 
